@@ -1,0 +1,56 @@
+{
+  "app": {
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "C:\\Users\\mingh\\.ohos\\config\\default_wordcraft-hmos_xbG98TqKi1TppL6NA2WU3AZdcyRgi43LiwVj50-Hj5w=.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001A11229FAFEEBF6923E8E1061F1656FE47F1D4323086189924728CB8060C2514D11F1395101040",
+          "profile": "C:\\Users\\mingh\\.ohos\\config\\default_wordcraft-hmos_xbG98TqKi1TppL6NA2WU3AZdcyRgi43LiwVj50-Hj5w=.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "C:\\Users\\mingh\\.ohos\\config\\default_wordcraft-hmos_xbG98TqKi1TppL6NA2WU3AZdcyRgi43LiwVj50-Hj5w=.p12",
+          "storePassword": "0000001A22E2C3E896A32AED9B78ED0A78BD46D20735FDDD00432E1548603A6382AA1FCD2939154E5A87"
+        }
+      }
+    ],
+    "products": [
+      {
+        "name": "default",
+        "signingConfig": "default",
+        "targetSdkVersion": "26.0.0",
+        "compatibleSdkVersion": "26.0.0",
+        "runtimeOS": "HarmonyOS"
+      }
+    ],
+    "buildModeSet": [
+      {
+        "name": "debug"
+      },
+      {
+        "name": "release"
+      }
+    ],
+    "capabilities": [
+      {
+        "bundleName": "io.github.shaliuxin.wordcraft.hmos",
+        "config": []
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "entry",
+      "srcPath": "./entry",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    }
+  ]
+}

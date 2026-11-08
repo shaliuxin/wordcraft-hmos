@@ -1,0 +1,10 @@
+{
+  "app": {
+    "bundleName": "io.github.shaliuxin.wordcraft.hmos",
+    "vendor": "wordcraft-hmos",
+    "versionCode": 15001,
+    "versionName": "0.15.1",
+    "icon": "$media:app_icon",
+    "label": "$string:app_name"
+  }
+}

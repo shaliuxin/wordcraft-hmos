@@ -1,0 +1,20 @@
+{
+  "UniformDataTypeDeclarations": [
+    {
+      "TypeId": "io.github.shaliuxin.wordcraft.hmos.docx",
+      "BelongingToTypes": [
+        "general.file"
+      ],
+      "FilenameExtensions": [
+        ".docx",
+        ".doc"
+      ],
+      "MIMETypes": [
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/msword"
+      ],
+      "Description": "WordCraft document",
+      "ReferenceURL": ""
+    }
+  ]
+}
