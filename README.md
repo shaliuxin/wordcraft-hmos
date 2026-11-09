@@ -245,6 +245,21 @@ wordcraft 的语言 / 字体机制与 solidcraft 不同（**完全走宿主注�
 
 ---
 
+## 中文输入法（IME，2026-11-09 真机通过）
+
+HarmonyOS 官方「自定义编辑框」方案，三步顺序不可颠倒：
+
+1. 1×1 透明锚点 `Text('').id('wordcraft-ime-anchor').focusable(true)` → `requestFocus`；
+2. `await inputMethod.getController().attach(true, textConfig)`；
+3. **attach 成功后**才注册 `insertText/setPreviewText/finishTextPreview/deleteLeft/sendFunctionKey`
+   （提前注册抛 `12800009 detached`，键盘完全不弹）。
+
+XComponent 已去 `.focusOnTouch(true)`。真机日志：`WordCraft native ime: show` → `IME attached` →
+`listeners bound`，无告警。PC 多窗口 + 外接键盘时系统不自动展开面板（系统「备忘录」同样），
+需点右下悬浮栏 ⌨ —— 系统策略，非应用缺陷。
+
+---
+
 ## 已知限制
 
 | 项 | 说明 |

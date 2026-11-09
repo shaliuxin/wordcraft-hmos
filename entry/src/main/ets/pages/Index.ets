@@ -4,6 +4,7 @@ import { fileIo, fileUri, picker } from '@kit.CoreFileKit';
 import { i18n } from '@kit.LocalizationKit';
 import { BusinessError, deviceInfo } from '@kit.BasicServicesKit';
 import { display } from '@kit.ArkUI';
+import { inputMethod } from '@kit.IMEKit';
 import { SYSTEM_THEME_DARK, SYSTEM_THEME_LIGHT } from '../SystemTheme';
 
 // Mirrors the Rust `Config` deserialized in native/rust/src/lib.rs.
@@ -98,6 +99,15 @@ struct Index {
   private generation: number = 0;
   private context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
   @State private deviceScale: number = 1;
+  // 中文输入法（与 DeckCraft / GridCraft 同一修法）：官方「自定义编辑框」方案要求
+  // attach 前先有一个获焦的 ArkUI 编辑组件（XComponent 原生表面不算），
+  // 且监听器必须在 attach 成功之后注册（否则 12800009）。
+  private imeController: inputMethod.InputMethodController | undefined = undefined;
+  private imeAttached: boolean = false;
+  private imeShown: boolean = false;
+  private imeInComposition: boolean = false;
+  private imeBound: boolean = false;
+  private imeWanted: boolean = false;
 
   aboutToAppear(): void {
     console.info('WordCraft native page appearing');
@@ -201,7 +211,129 @@ struct Index {
     } else if (request.kind === 'hostsave') {
       // host_save：把字节写到 pickSave 选出的 URI（request.text），data 即文档字节。
       this.writeSave(id, request.text, data);
+    } else if (request.kind === 'ime') {
+      // Rust 通知：egui 文本字段获得/失去焦点 → 弹起/收起软键盘。
+      this.setImeKeyboard(request.text === 'show');
     }
+  }
+
+  // ===================== 中文输入法（IME） =====================
+  // 鸿蒙软键盘中文输入法走 InputMethod 框架，不经 XComponent 原始按键事件。
+  // 顺序（实测必须）：锚点获焦 → attach(showKeyboard=true) → attach 成功后注册监听。
+  // 否则 attach 报 12800003（编辑框未获焦）或监听注册报 12800009（未附加）。
+
+  private imeControllerOrGet(): inputMethod.InputMethodController | undefined {
+    if (this.imeController) {
+      return this.imeController;
+    }
+    try {
+      const controller: inputMethod.InputMethodController = inputMethod.getController();
+      this.imeController = controller;
+      return controller;
+    } catch (error) {
+      console.error(`WordCraft IME controller failed: ${(error as Error).message}`);
+      return undefined;
+    }
+  }
+
+  private bindImeListeners(controller: inputMethod.InputMethodController): void {
+    if (this.imeBound) {
+      return;
+    }
+    try {
+      // insertText = 已确认上屏文本；setPreviewText = 拼音组合态；finishTextPreview = 组合结束；
+      // deleteLeft = 退格（组合态内由键盘自行处理）；sendFunctionKey = 回车；sendKeyboardStatus = 显隐。
+      controller.on('insertText', (text: string): void => { this.sendIme('commit', text); });
+      controller.on('setPreviewText', (text: string, _range: inputMethod.Range): void => {
+        this.imeInComposition = (text.length > 0);
+        this.sendIme('preedit', text);
+      });
+      controller.on('finishTextPreview', (): void => { this.imeInComposition = false; this.sendIme('preedit', ''); });
+      controller.on('deleteLeft', (length: number): void => {
+        if (!this.imeInComposition) { this.sendIme('delete', String(length)); }
+      });
+      controller.on('sendFunctionKey', (_key: inputMethod.FunctionKey): void => { this.sendIme('enter', ''); });
+      controller.on('sendKeyboardStatus', (status: inputMethod.KeyboardStatus): void => {
+        this.imeShown = (status === inputMethod.KeyboardStatus.SHOW);
+      });
+      this.imeBound = true;
+      console.info('WordCraft IME listeners bound');
+    } catch (error) {
+      console.warn(`WordCraft IME bind failed: ${(error as Error).message}`);
+    }
+  }
+
+  private async setImeKeyboard(show: boolean): Promise<void> {
+    if (!this.alive) {
+      return;
+    }
+    this.imeWanted = show;
+    const controller = this.imeControllerOrGet();
+    if (!controller) {
+      return;
+    }
+    if (show) {
+      try {
+        this.getUIContext().getFocusController().requestFocus('wordcraft-ime-anchor');
+      } catch (error) {
+        console.warn(`WordCraft IME anchor focus failed: ${(error as Error).message}`);
+      }
+      try {
+        await controller.attach(true, this.imeTextConfig());
+        this.imeAttached = true;
+        this.imeShown = true;
+        console.info('WordCraft IME attached');
+      } catch (error) {
+        console.warn(`WordCraft IME attach failed: ${(error as Error).message}`);
+        try {
+          await controller.showTextInput(inputMethod.RequestKeyboardReason.OTHER);
+          this.imeAttached = true;
+          this.imeShown = true;
+        } catch (e2) {
+          console.warn(`WordCraft IME show failed: ${(e2 as Error).message}`);
+        }
+      }
+      if (this.imeAttached) {
+        this.bindImeListeners(controller);
+        try {
+          // PC 模式/外接键盘下 attach(true) 可能只出现悬浮工具栏，TOUCH 理由尝试强制展开面板。
+          await controller.showTextInput(inputMethod.RequestKeyboardReason.TOUCH);
+        } catch (error) {
+          console.warn(`WordCraft IME touch-show failed: ${(error as Error).message}`);
+        }
+      }
+    } else {
+      this.imeInComposition = false;
+      try {
+        if (this.imeAttached) { await controller.hideTextInput(); }
+      } catch (error) {
+        console.warn(`WordCraft IME hide failed: ${(error as Error).message}`);
+      }
+      try {
+        if (this.imeAttached) { await controller.detach(); }
+      } catch (error) {
+        // 未绑定 / 重复 detach：忽略。
+      }
+      this.imeAttached = false;
+      this.imeShown = false;
+    }
+  }
+
+  private imeTextConfig(): inputMethod.TextConfig {
+    return {
+      inputAttribute: {
+        textInputType: inputMethod.TextInputType.TEXT,
+        enterKeyType: inputMethod.EnterKeyType.NEWLINE,
+        consumeKeyEvents: true,
+      },
+    };
+  }
+
+  private sendIme(op: string, text: string): void {
+    if (!this.alive) {
+      return;
+    }
+    native.input(JSON.stringify({ kind: 'ime', op, text }));
   }
 
   private async pickDocument(id: number, _gallery: boolean): Promise<void> {
@@ -340,8 +472,25 @@ struct Index {
           .onLoad((): void => {
             try { this.getUIContext().getFocusController().requestFocus('wordcraft-editor'); } catch (e) {}
           })
-          .id('wordcraft-editor').focusable(true).defaultFocus(true).focusOnTouch(true)
+          // 不设 focusOnTouch：打字期间点击画布若把焦点抢回 XComponent（非编辑代理），
+          // 会断开输入法绑定导致键盘收起；触摸/指针事件不经 ArkUI 焦点，不受影响。
+          .id('wordcraft-editor').focusable(true).defaultFocus(true)
       }
+      // 隐藏的 IME 锚点：输入法框架只认「获得焦点的编辑组件」为可输入位置，
+      // attach 前必须先聚焦它（官方自定义编辑框方案）。
+      Text('')
+        .id('wordcraft-ime-anchor')
+        .focusable(true)
+        .width(1).height(1)
+        .opacity(0)
+        .hitTestBehavior(HitTestMode.None)
+        .onBlur((): void => {
+          if (this.imeAttached) {
+            this.imeAttached = false;
+            this.imeShown = false;
+            console.info('WordCraft IME anchor blurred, binding reset');
+          }
+        })
       if (this.startupVisible) {
         Column() {
           Column({ space: 18 }) {
