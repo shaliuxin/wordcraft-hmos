@@ -4159,7 +4159,7 @@ checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
 
 [[package]]
 name = "wordcraft-doc"
-version = "0.15.1"
+version = "0.17.0"
 dependencies = [
  "base64 0.23.1",
  "log",
@@ -4172,7 +4172,7 @@ dependencies = [
 
 [[package]]
 name = "wordcraft-docbin"
-version = "0.15.1"
+version = "0.17.0"
 dependencies = [
  "cfb",
  "chrono",
@@ -4187,7 +4187,7 @@ dependencies = [
 
 [[package]]
 name = "wordcraft-docx"
-version = "0.15.1"
+version = "0.17.0"
 dependencies = [
  "aes",
  "base64 0.23.1",
@@ -4209,7 +4209,7 @@ dependencies = [
 
 [[package]]
 name = "wordcraft-engine"
-version = "0.15.1"
+version = "0.17.0"
 dependencies = [
  "chrono",
  "craft-font-catalog",
@@ -4239,7 +4239,7 @@ dependencies = [
 
 [[package]]
 name = "wordcraft-fonts"
-version = "0.15.1"
+version = "0.17.0"
 dependencies = [
  "brotli-decompressor",
  "harfrust 0.13.3",
@@ -4253,7 +4253,7 @@ dependencies = [
 
 [[package]]
 name = "wordcraft-formats"
-version = "0.15.1"
+version = "0.17.0"
 dependencies = [
  "aes",
  "base64 0.23.1",
@@ -4279,7 +4279,7 @@ dependencies = [
 
 [[package]]
 name = "wordcraft-geom"
-version = "0.15.1"
+version = "0.17.0"
 dependencies = [
  "image",
  "serde",
@@ -4304,7 +4304,7 @@ dependencies = [
 
 [[package]]
 name = "wordcraft-layout"
-version = "0.15.1"
+version = "0.17.0"
 dependencies = [
  "craft-proof",
  "image",
@@ -4324,7 +4324,7 @@ dependencies = [
 
 [[package]]
 name = "wordcraft-metafile"
-version = "0.15.1"
+version = "0.17.0"
 dependencies = [
  "kurbo",
  "thiserror",
@@ -4332,7 +4332,7 @@ dependencies = [
 
 [[package]]
 name = "wordcraft-pdf"
-version = "0.15.1"
+version = "0.17.0"
 dependencies = [
  "chrono",
  "craft-pdf",
@@ -4350,7 +4350,7 @@ dependencies = [
 
 [[package]]
 name = "wordcraft-render"
-version = "0.15.1"
+version = "0.17.0"
 dependencies = [
  "image",
  "log",
@@ -4364,7 +4364,7 @@ dependencies = [
 
 [[package]]
 name = "wordcraft-ui-egui"
-version = "0.15.1"
+version = "0.17.0"
 dependencies = [
  "chrono",
  "craft-i18n",
@@ -4393,7 +4393,7 @@ dependencies = [
 
 [[package]]
 name = "wordcraft-zotero"
-version = "0.15.1"
+version = "0.17.0"
 dependencies = [
  "log",
  "serde_json",
