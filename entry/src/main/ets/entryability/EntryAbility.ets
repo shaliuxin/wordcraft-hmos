@@ -3,6 +3,7 @@ import { AbilityConstant, Configuration, UIAbility, Want } from '@kit.AbilityKit
 import { window } from '@kit.ArkUI';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { publishSystemTheme, systemThemeFromColorMode } from '../SystemTheme';
+import { requestWindowClose, resetCloseGuard } from '../closeGuard';
 
 class SystemThemeInput {
   kind: string = 'system_theme';
@@ -23,6 +24,7 @@ export default class EntryAbility extends UIAbility {
   }
 
   onCreate(want: Want, _launchParam: AbilityConstant.LaunchParam): void {
+    resetCloseGuard();
     this.syncSystemTheme(this.context.config?.colorMode);
     console.info('WordCraft native ability created');
   }
@@ -47,6 +49,9 @@ export default class EntryAbility extends UIAbility {
   }
 
   onWindowStageCreate(windowStage: window.WindowStage): void {
+    // 关闭守卫：拦截系统关窗事件，交给 closeGuard → Rust 检查未保存文档；确认后再放行关闭。
+    // 回调需返回 boolean 决定窗口是否关闭（SDK 标注为 Callback<void>，运行期按 boolean 处理）。
+    windowStage.on('windowStageClose', () => requestWindowClose());
     if (AppStorage.get<string>('wordcraftSystemTheme') === undefined) {
       this.syncSystemTheme(this.context.config?.colorMode);
     }

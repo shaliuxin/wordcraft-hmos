@@ -6,6 +6,7 @@ import { BusinessError, deviceInfo } from '@kit.BasicServicesKit';
 import { display } from '@kit.ArkUI';
 import { inputMethod } from '@kit.IMEKit';
 import { SYSTEM_THEME_DARK, SYSTEM_THEME_LIGHT } from '../SystemTheme';
+import { allowConfirmedClose, setCloseRequest } from '../closeGuard';
 
 // Mirrors the Rust `Config` deserialized in native/rust/src/lib.rs.
 class NativeConfig {
@@ -123,7 +124,19 @@ struct Index {
     this.alive = false;
     this.generation++;
     this.initialized = false;
+    setCloseRequest(null);
     native.active(false);
+  }
+
+  // 返回键/返回手势：转发为一次 Escape 按键（code 2070），交给 egui 处理（如取消当前对话框）；
+  // 返回 true 表示已消费，不退出页面。
+  onBackPress(): boolean {
+    if (!this.alive) {
+      return false;
+    }
+    native.input(JSON.stringify({ kind: 'key', code: 2070, action: 0, text: '', ctrl: false, shift: false, alt: false }));
+    native.input(JSON.stringify({ kind: 'key', code: 2070, action: 1, text: '', ctrl: false, shift: false, alt: false }));
+    return true;
   }
 
   private async initializeHost(generation: number): Promise<void> {
@@ -143,6 +156,9 @@ struct Index {
         (id: number, message: string, data: ArrayBuffer): void => { this.receive(id, message, data); });
       this.initialized = true;
       this.failure = '';
+      // 关闭守卫：系统关窗（窗口关闭按钮 / 2in1 任务关闭）被 closeGuard 拦截，
+      // 经此处理器转成 native.close() 交给 Rust 检查未保存文档；确认后再放行关闭。
+      setCloseRequest((): void => { native.close(); });
       // A file launched from the system shares its URI through onNewWant.
       const want = AppStorage.get<string>('wordcraftOpenWant');
       if (want && want.length > 0) {
@@ -200,6 +216,7 @@ struct Index {
       this.failure = '';
       if (request.kind === 'first_frame') { this.revealEditor(); }
     } else if (request.kind === 'close') {
+      allowConfirmedClose();
       this.context.terminateSelf();
     } else if (request.kind === 'url') {
       this.context.startAbility({ action: 'ohos.want.action.viewData', uri: request.text })

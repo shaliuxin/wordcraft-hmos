@@ -384,7 +384,10 @@ napi_value InitHost(napi_env env, napi_callback_info info) {
 napi_value Input(napi_env env, napi_callback_info info) {
     size_t n = 1; napi_value arg; napi_get_cb_info(env, info, &n, &arg, nullptr, nullptr);
     cur = nullptr;
-    if (n) { auto s = String(env, arg); Json(s); }
+    if (n) {
+        auto s = String(env, arg);
+        Json(s);
+    }
     return Undefined(env);
 }
 napi_value Command(napi_env env, napi_callback_info info) {

@@ -399,7 +399,11 @@ fn worker(config: Config, rx: mpsc::Receiver<Message>) {
     let started = Instant::now();
     let mut events: Vec<egui::Event> = Vec::new();
     let mut input_state = input::State::default();
-    let mut close = false;
+    // 关窗门控：系统关窗（close-guard 路由）/ egui Ctrl+Q 请求关闭时，先交 wordcraft 检查
+    // 未保存文档；有未保存则弹「是否保存」提示并暂缓，用户作答后 app 置 quit_requested，
+    // 届时才通知宿主真正关闭窗口。close_pending=有一次待处理的关闭请求；terminating=已通知宿主关闭。
+    let mut close_pending = false;
+    let mut terminating = false;
     // 软键盘是否已由宿主弹起：避免每帧重复通知，仅在 egui 文本焦点变化时切换。
     let mut ime_shown = false;
 
@@ -496,7 +500,9 @@ fn worker(config: Config, rx: mpsc::Receiver<Message>) {
                     }
                     Message::Close => {
                         bridge::resume();
-                        close = true;
+                        // 系统关窗经 close-guard 路由到此：标记一次待处理的关闭请求，
+                        // 由下一帧的 close_requested() 检查未保存文档，有则弹「是否保存」提示。
+                        close_pending = true;
                         deadline = Some(Instant::now());
                     }
                     Message::Wake(delay) => {
@@ -538,11 +544,8 @@ fn worker(config: Config, rx: mpsc::Receiver<Message>) {
                         viewport.native_pixels_per_point = Some(config.scale);
                         viewport.inner_rect = raw.screen_rect;
                         viewport.focused = Some(true);
-                        let validating_close = close;
-                        if close {
-                            viewport.events.push(egui::ViewportEvent::Close);
-                            close = false;
-                        }
+                        // 关窗不再向 egui 推 ViewportEvent::Close：wordcraft 的关闭由
+                        // close_requested()/quit_requested 驱动（见下方 close 门控）。
                         // wordcraft 的宿主缝：raw_input_hook 需要 ctx（solidcraft 的 raw_input_hook 只收 raw）。
                         app.raw_input_hook(&ctx, &mut raw);
                         let output = editor_frame(&ctx, &mut app, raw);
@@ -564,13 +567,24 @@ fn worker(config: Config, rx: mpsc::Receiver<Message>) {
                             commands.extend(v.commands.clone());
                             repaint_delay = Some(v.repaint_delay);
                         }
-                        match close_action(validating_close, &commands, &app) {
-                            CloseAction::Confirm => bridge::notify(0, "close", "", &[]),
-                            CloseAction::Request => {
-                                close = true;
-                                deadline = Some(Instant::now());
+                        // 关窗门控：系统关窗 / egui 请求关闭时，交 wordcraft 检查未保存文档。
+                        // 有未保存改动则 close_requested() 弹出「是否保存」提示并返回 false（暂缓），
+                        // 用户选保存/丢弃后 app 置 quit_requested，届时才通知宿主真正关闭窗口；
+                        // 无未保存改动时 close_requested() 返回 true，直接放行。
+                        if !terminating {
+                            let close_now = close_pending
+                                || commands.contains(&egui::ViewportCommand::Close);
+                            if close_now {
+                                close_pending = false;
+                                if app.close_requested() {
+                                    bridge::notify(0, "close", "", &[]);
+                                    terminating = true;
+                                }
                             }
-                            CloseAction::Cancel | CloseAction::None => {}
+                            if app.quit_requested {
+                                bridge::notify(0, "close", "", &[]);
+                                terminating = true;
+                            }
                         }
                         let painted = render.paint(&ctx, output)?;
                         if first_frame_marker(painted) {
@@ -622,28 +636,6 @@ fn editor_frame(
         }
         app.ui(ui);
     })
-}
-
-#[cfg(target_env = "ohos")]
-#[derive(Debug, PartialEq, Eq)]
-enum CloseAction {
-    None,
-    Request,
-    Cancel,
-    Confirm,
-}
-
-#[cfg(target_env = "ohos")]
-fn close_action(validating: bool, commands: &[egui::ViewportCommand], app: &WordApp) -> CloseAction {
-    if commands.contains(&egui::ViewportCommand::CancelClose) {
-        CloseAction::Cancel
-    } else if validating {
-        CloseAction::Confirm
-    } else if commands.contains(&egui::ViewportCommand::Close) || app.quit_requested {
-        CloseAction::Request
-    } else {
-        CloseAction::None
-    }
 }
 
 /// 文件服务（OHOS 宿主与桌面不同的关键点在 save）：
